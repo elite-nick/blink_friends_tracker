@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<meta charset="utf-8">
+<title>Blink Friends Tracker v0.1</title>
+<link rel="icon" href="https://blinkmap.com/favicon-32x32.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+
+body{
+font-family:Arial;
+background:#111;
+color:#eee;
+margin:0;
+}
+
+#top{ padding:10px; }
+
+button{
+padding:10px 20px;
+font-size:16px;
+margin-bottom:10px;
+}
+
+.success{ color:#5cff72; }
+.error{ color:#ff4d4d; }
+
+#container{
+display:flex;
+height:90vh;
+}
+
+#map{ width:50%; }
+
+#table-container{
+width:50%;
+overflow:auto;
+}
+
+table{
+border-collapse:collapse;
+width:100%;
+}
+
+td,th{
+border:1px solid #444;
+padding:6px;
+font-size:13px;
+}
+
+tr:hover{
+background:#222;
+cursor:pointer;
+}
+
+.my-user{
+background:#1f3d2b !important;
+border-left:4px solid #00ff88;
+}
+
+img{ border-radius:6px; }
+
+pre{
+max-height:150px;
+overflow:auto;
+background:#000;
+padding:5px;
+}
+
+/* progress */
+#progress-container{
+width:300px;
+height:10px;
+background:#333;
+margin-top:5px;
+border-radius:5px;
+overflow:hidden;
+}
+
+#progress-bar{
+height:100%;
+width:0%;
+background:#00ff88;
+transition:width 0.2s;
+}
+
+.moved{ color:#00ff88; }
+.same{ color:#aaa; }
+.new{ color:#4da6ff; }
+
+</style>
+
+</head>
+
+<body>
+
+<div id="top">
+
+<h2>Blink Friends Tracker</h2>
+
+<button onclick="loadData()">Refresh info</button>
+
+<div id="status"></div>
+<div id="progress-text"></div>
+
+<div id="progress-container">
+  <div id="progress-bar"></div>
+</div>
+
+<div id="updated"></div>
+<div id="count"></div>
+
+</div>
+
+<div id="container">
+
+<div id="map"></div>
+
+<div id="table-container">
+
+<table>
+
+<thead>
+<tr>
+<th>Avatar</th>
+<th>User (ID)</th>
+<th>Lat</th>
+<th>Lon</th>
+<th>Change</th>
+<th>Idle</th>
+<th>Battery</th>
+<th>Accuracy</th>
+<th>Last update</th>
+<th>Last online</th>
+<th>JSON</th>
+</tr>
+</thead>
+
+<tbody id="tbody"></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+
+const map = L.map('map').setView([56.25, 43.86], 11)
+
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+maxZoom: 19
+}).addTo(map)
+
+let markersLayer = L.layerGroup().addTo(map)
+let prevCoords = {}
+
+let progressInterval = null
+
+function startProgress(){
+let progress = 0
+const bar = document.getElementById("progress-bar")
+const text = document.getElementById("progress-text")
+
+bar.style.width = "0%"
+
+progressInterval = setInterval(()=>{
+if(progress < 90){
+progress += Math.random() * 10
+bar.style.width = progress + "%"
+text.innerText = "Loading: " + Math.floor(progress) + "%"
+}
+}, 200)
+}
+
+function finishProgress(){
+clearInterval(progressInterval)
+document.getElementById("progress-bar").style.width = "100%"
+document.getElementById("progress-text").innerText = "Loading: 100%"
+}
+
+function formatBattery(val){
+if(val == null) return ""
+if(val < 0) return "⚡ Charging (" + Math.abs(val) + "%)"
+return "🔋 " + val + "%"
+}
+
+function formatDuration(seconds){
+
+seconds = Math.floor(seconds)
+
+const h = Math.floor(seconds / 3600)
+const m = Math.floor((seconds % 3600) / 60)
+const s = seconds % 60
+
+return `${h}h ${m}m ${s}s`
+}
+
+function getStatusAndIdle(id, lat, lon){
+
+const now = Date.now() / 1000
+
+if(!prevCoords[id]){
+prevCoords[id] = {lat, lon, lastMoveTs: now}
+return {change:"New", cls:"new", idle:"0s"}
+}
+
+const prev = prevCoords[id]
+
+if(prev.lat !== lat || prev.lon !== lon){
+prevCoords[id] = {lat, lon, lastMoveTs: now}
+return {change:"Moved", cls:"moved", idle:"0s"}
+}
+
+const idleSeconds = now - prev.lastMoveTs
+
+return {
+change:"Same",
+cls:"same",
+idle: formatDuration(idleSeconds)
+}
+
+}
+
+function addUserRow(user, isMy=false){
+
+const acc=user.account || {}
+const geo=user.geo || {}
+
+const lat=geo.latitude
+const lon=geo.longitude
+
+const marker = L.marker([lat, lon]).addTo(markersLayer)
+
+marker.bindPopup(`
+<b>${acc.username} (${acc.id})</b><br>
+<img src="${acc.avatar_thumbnail || acc.avatar || ''}" width="80">
+`)
+
+if(isMy){
+marker.openPopup()
+map.setView([lat, lon], 14)
+}
+
+const st = getStatusAndIdle(acc.id, lat, lon)
+
+const row=document.createElement("tr")
+
+if(isMy){
+row.classList.add("my-user")
+}
+
+row.innerHTML=`
+
+<td><img src="${acc.avatar_thumbnail || acc.avatar || ''}" width="50"></td>
+
+<td>
+${acc.username}<br>
+<small style="color:#aaa">ID: ${acc.id}</small>
+</td>
+
+<td>${lat}</td>
+<td>${lon}</td>
+
+<td class="${st.cls}">${st.change}</td>
+
+<td>${st.idle}</td>
+
+<td>${formatBattery(geo.charge)}</td>
+<td>${geo.accuracy ?? ""}</td>
+<td>${geo.last_update || ""}</td>
+<td>${acc.last_online || ""}</td>
+
+<td>
+<details>
+<summary>open</summary>
+<pre>${JSON.stringify(user,null,2)}</pre>
+</details>
+</td>
+
+`
+
+row.onclick = () => {
+map.setView([lat, lon], 16)
+marker.openPopup()
+}
+
+document.getElementById("tbody").appendChild(row)
+
+}
+
+function loadData(){
+
+startProgress()
+
+fetch("/markers")
+.then(r=>r.json())
+.then(resp=>{
+
+finishProgress()
+
+markersLayer.clearLayers()
+
+const statusDiv=document.getElementById("status")
+const updatedDiv=document.getElementById("updated")
+
+if(resp.status===200){
+statusDiv.innerHTML="API status: <span class='success'>200 (success)</span>"
+}else{
+statusDiv.innerHTML="API status: <span class='error'>"+resp.status+"</span>"
+}
+
+updatedDiv.innerText="Last update info: "+resp.updated_at
+
+const data=resp.data
+
+const tbody=document.getElementById("tbody")
+tbody.innerHTML=""
+
+document.getElementById("count").innerText="Users: "+data.markers.length
+
+if(data.my_marker){
+addUserRow(data.my_marker, true)
+}
+
+data.markers.forEach(user=>{
+addUserRow(user, false)
+})
+
+})
+
+.catch(err=>{
+finishProgress()
+document.getElementById("status").innerHTML="<span class='error'>Query Error</span>"
+document.getElementById("progress-text").innerText="Loading Error"
+})
+
+}
+
+loadData()
+
+</script>
+
+</body>
+
+</html>
