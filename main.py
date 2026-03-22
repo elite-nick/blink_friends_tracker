@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 import requests
 from datetime import datetime
 
@@ -31,19 +31,15 @@ def index():
 def markers():
 
     r = requests.post(API_URL, headers=HEADERS)
-
     status_code = r.status_code
-
     data = r.json()
 
     for m in data.get("markers", []):
-
         geo = m.get("geo", {})
         acc = m.get("account", {})
 
         geo["last_update"] = ts_to_date(geo.get("last_update_ts"))
         geo["first_entry"] = ts_to_date(geo.get("first_entry_ts"))
-
         acc["last_online"] = ts_to_date(acc.get("last_online_ts"))
 
     return jsonify({
@@ -51,6 +47,30 @@ def markers():
         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "data": data
     })
+
+
+@app.route("/friends/<int:user_id>")
+def get_friends(user_id):
+
+    url = f"https://pin.apiblink.ru/api/account/{user_id}/friends?limit=1000&offset=0"
+    r = requests.get(url, headers=HEADERS)
+
+    return jsonify(r.json())
+
+
+@app.route("/send_sticker/<int:user_id>", methods=["POST"])
+def send_sticker(user_id):
+
+    body = request.json
+
+    url = f"https://pin.apiblink.ru/api/messenger/{user_id}/audio-stickers/send"
+
+    r = requests.post(url, headers={
+        **HEADERS,
+        "Content-Type": "application/json"
+    }, json=body)
+
+    return jsonify(r.json())
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@
 <head>
 
 <meta charset="utf-8">
-<title>Blink Friends Tracker v0.1</title>
+<title>Blink Friends Tracker v0.2</title>
 <link rel="icon" href="https://blinkmap.com/favicon-32x32.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
@@ -23,6 +23,7 @@ button{
 padding:10px 20px;
 font-size:16px;
 margin-bottom:10px;
+cursor:pointer;
 }
 
 .success{ color:#5cff72; }
@@ -30,13 +31,12 @@ margin-bottom:10px;
 
 #container{
 display:flex;
-height:90vh;
+height:70vh;
 }
 
-#map{ width:50%; }
+#map{ width:35%; }
 
 #table-container{
-width:50%;
 overflow:auto;
 }
 
@@ -91,6 +91,24 @@ transition:width 0.2s;
 .same{ color:#aaa; }
 .new{ color:#4da6ff; }
 
+/* modal */
+#modal{
+position:fixed;
+top:0;left:0;
+width:100%;height:100%;
+background:rgba(0,0,0,0.8);
+display:none;
+overflow:auto;
+padding:20px;
+z-index:9999;
+}
+
+#modal-content{
+background:#111;
+padding:20px;
+border:1px solid #444;
+}
+
 </style>
 
 </head>
@@ -135,6 +153,9 @@ transition:width 0.2s;
 <th>Accuracy</th>
 <th>Last update</th>
 <th>Last online</th>
+<th>Place Type</th>
+<th>Marker Tail</th>
+<th>Actions</th>
 <th>JSON</th>
 </tr>
 </thead>
@@ -145,6 +166,12 @@ transition:width 0.2s;
 
 </div>
 
+</div>
+
+<!-- MODAL -->
+<div id="modal">
+<div id="modal-content"></div>
+<button onclick="closeModal()">Close</button>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -191,14 +218,84 @@ return "🔋 " + val + "%"
 }
 
 function formatDuration(seconds){
-
 seconds = Math.floor(seconds)
-
 const h = Math.floor(seconds / 3600)
 const m = Math.floor((seconds % 3600) / 60)
 const s = seconds % 60
-
 return `${h}h ${m}m ${s}s`
+}
+
+function formatPlaceType(type){
+switch(type){
+case 0: return "❌ Nothing"
+case 1: return "🏠 Home"
+case 2: return "💼 Work"
+case 5: return "🚗 On the way"
+case 7: return "🌙 Home (sleepover)"
+default: return "❓ Unknown (" + type + ")"
+}
+}
+
+function showModal(html){
+document.getElementById("modal-content").innerHTML = html
+document.getElementById("modal").style.display = "block"
+}
+
+function closeModal(){
+document.getElementById("modal").style.display = "none"
+}
+
+function viewFriends(userId){
+
+fetch(`/friends/${userId}`)
+.then(r=>r.json())
+.then(data=>{
+
+let html = "<h3>Friends:</h3>"
+
+data.account_friends.forEach(f=>{
+html += `
+<div style="margin-bottom:10px">
+<img src="${f.avatar_thumbnail || ''}" width="40">
+<b>${f.username}</b> (${f.name || ""})<br>
+Friends: ${f.friends_count}
+</div>
+`
+})
+
+showModal(html)
+
+})
+
+}
+
+function sendSticker(userId){
+
+const stickerId = prompt("Type sticker ID:")
+if(!stickerId) return
+
+const count = prompt("Type count:")
+if(!count) return
+
+fetch(`/send_sticker/${userId}`, {
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body: JSON.stringify({
+sticker_id: Number(stickerId),
+count: Number(count)
+})
+})
+.then(r=>r.json())
+.then(resp=>{
+if(resp.ok){
+alert("✅ Successfully sent")
+}else{
+alert("❌ Error, try again or sticker is not paid")
+}
+})
+
 }
 
 function getStatusAndIdle(id, lat, lon){
@@ -231,6 +328,7 @@ function addUserRow(user, isMy=false){
 
 const acc=user.account || {}
 const geo=user.geo || {}
+const customization = user.customization || {}
 
 const lat=geo.latitude
 const lon=geo.longitude
@@ -268,13 +366,20 @@ ${acc.username}<br>
 <td>${lon}</td>
 
 <td class="${st.cls}">${st.change}</td>
-
 <td>${st.idle}</td>
 
 <td>${formatBattery(geo.charge)}</td>
 <td>${geo.accuracy ?? ""}</td>
 <td>${geo.last_update || ""}</td>
 <td>${acc.last_online || ""}</td>
+
+<td>${formatPlaceType(geo.place_type)}</td>
+<td>${customization.marker_tail || ""}</td>
+
+<td>
+<button onclick="event.stopPropagation(); viewFriends(${acc.id})">Friends</button>
+<button onclick="event.stopPropagation(); sendSticker(${acc.id})">Send 🎧</button>
+</td>
 
 <td>
 <details>
