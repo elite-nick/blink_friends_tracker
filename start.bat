@@ -1,4 +1,4 @@
 @echo off
-title Blink Friends Tracker v0.1 (Log)
+title Blink Friends Tracker (Log)
 python main.py
 pause
