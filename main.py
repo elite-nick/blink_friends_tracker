@@ -7,11 +7,10 @@ app = Flask(__name__)
 API_URL = "https://pin.apiblink.ru/api/map/markers"
 
 HEADERS = {
-    "User-Agent": "Blink/1.24.3 200; com.blinkmap Android/35",
+    "User-Agent": "Blink/1.24.4 201; com.blinkmap Android/35",
     "Connection": "keep-alive",
     "Accept": "*/*",
     "Accept-Encoding": "gzip",
-    "Cookie": "COOKIE",
     "authorization": "TOKEN"
 }
 
