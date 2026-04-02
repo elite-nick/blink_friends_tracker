@@ -120,6 +120,7 @@ border:1px solid #444;
 <h2>Blink Friends Tracker</h2>
 
 <button onclick="loadData()">Refresh info</button>
+<button onclick="refreshSession()">Refresh session</button>
 
 <div id="status"></div>
 <div id="progress-text"></div>
@@ -447,6 +448,18 @@ document.getElementById("status").innerHTML="<span class='error'>Query Error</sp
 document.getElementById("progress-text").innerText="Loading Error"
 })
 
+}
+
+function refreshSession(){
+fetch("/refresh_session", {method:"POST"})
+.then(r=>r.json())
+.then(resp=>{
+if(resp.success){
+alert("✅ Session updated")
+}else{
+alert("❌ Failed to refresh session")
+}
+})
 }
 
 loadData()
