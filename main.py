@@ -5,6 +5,7 @@ from datetime import datetime
 app = Flask(__name__)
 
 API_URL = "https://pin.apiblink.ru/api/map/markers"
+ONLINE_URL = "https://pin.apiblink.ru/api/online"
 
 PROVIDER_IDENTIFIER = "PROVIDER_IDENTIFIER"
 STATIC_TOKEN = "STATIC_TOKEN"
@@ -81,6 +82,25 @@ def ts_to_date(ts):
 @app.route("/")
 def index():
     return render_template("index.html")
+    
+@app.route("/online")
+def online():
+
+    r = api_request(
+        "GET",
+        ONLINE_URL,
+        headers={
+            "If-Modified-Since": datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
+        }
+    )
+
+    try:
+        data = r.json()
+    except:
+        data = []
+
+    return jsonify(data)
+
 
 
 @app.route("/markers")
@@ -94,13 +114,63 @@ def markers():
     except:
         data = {}
 
+    online_map = {}
+
+    try:
+        online_resp = api_request("GET", ONLINE_URL)
+        online_data = online_resp.json()
+
+        for o in online_data:
+            online_map[o["account_id"]] = {
+                "online": o.get("online", False),
+                "timestamp": o.get("timestamp", 0)
+            }
+
+    except:
+        pass
+
     for m in data.get("markers", []):
         geo = m.get("geo", {})
         acc = m.get("account", {})
 
-        geo["last_update"] = ts_to_date(geo.get("last_update_ts"))
-        geo["first_entry"] = ts_to_date(geo.get("first_entry_ts"))
-        acc["last_online"] = ts_to_date(acc.get("last_online_ts"))
+        uid = acc.get("id")
+
+        if uid in online_map:
+            acc["online_now"] = online_map[uid]["online"]
+            acc["online_ts"] = ts_to_date(
+                online_map[uid]["timestamp"]
+            )
+        else:
+            acc["online_now"] = False
+            acc["online_ts"] = ""
+
+        geo["last_update"] = ts_to_date(
+            geo.get("last_update_ts")
+        )
+
+        geo["first_entry"] = ts_to_date(
+            geo.get("first_entry_ts")
+        )
+
+        acc["last_online"] = ts_to_date(
+            acc.get("last_online_ts")
+        )
+
+    if data.get("my_marker"):
+        geo = data["my_marker"].get("geo", {})
+        acc = data["my_marker"].get("account", {})
+
+        geo["last_update"] = ts_to_date(
+            geo.get("last_update_ts")
+        )
+
+        geo["first_entry"] = ts_to_date(
+            geo.get("first_entry_ts")
+        )
+
+        acc["last_online"] = ts_to_date(
+            acc.get("last_online_ts")
+        )
 
     return jsonify({
         "status": status_code,
@@ -108,7 +178,6 @@ def markers():
         "data": data,
         "session": SESSION_TOKEN
     })
-
 
 @app.route("/friends/<int:user_id>")
 def get_friends(user_id):
@@ -142,6 +211,60 @@ def manual_refresh():
         "session": SESSION_TOKEN
     })
 
+@app.route("/send_steps", methods=["POST"])
+def send_steps():
+
+    body = request.json
+    steps = body.get("steps")
+
+    if not steps:
+        return jsonify({"ok": False, "error": "No steps provided"})
+
+    now = datetime.now()
+
+    payload = {
+        "stats": [{
+            "steps": int(steps),
+            "date": int(now.timestamp()),
+            "time": now.isoformat()
+        }],
+        "data_source": "gms"
+    }
+
+    url = "https://pin.apiblink.ru/api/step/stats"
+
+    r = api_request(
+        "POST",
+        url,
+        headers={"Content-Type": "application/json"},
+        json=payload
+    )
+
+    try:
+        return jsonify({
+            "status": r.status_code,
+            "response": r.json()
+        })
+    except:
+        return jsonify({
+            "status": r.status_code,
+            "response": r.text
+        })
+
+@app.route("/steps_top")
+def steps_top():
+
+    url = "https://pin.apiblink.ru/api/step/stats?period=day"
+
+    r = api_request("GET", url)
+
+    try:
+        return jsonify(r.json())
+    except:
+        return jsonify({
+            "error": "Failed to parse response",
+            "raw": r.text
+        })
 
 if __name__ == "__main__":
     refresh_session()

@@ -2,469 +2,840 @@
 <html>
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blink Friends Tracker v0.4</title>
+    <link rel="icon" href="https://blinkmap.com/favicon-32x32.png">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-<meta charset="utf-8">
-<title>Blink Friends Tracker v0.3</title>
-<link rel="icon" href="https://blinkmap.com/favicon-32x32.png">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <style>
+        :root {
+            --primary: #7ddc9a;
+            --primary2: #43c96e;
+            --bg: #0b0f0d;
+            --surface: rgba(255, 255, 255, .06);
+            --surface2: rgba(255, 255, 255, .09);
+            --stroke: rgba(255, 255, 255, .08);
+            --text: #eef6f0;
+            --muted: #9ab0a2;
+            --danger: #ff6b6b;
+            --radius: 22px;
+            --blur: 20px;
+            --shadow: 0 12px 40px rgba(0, 0, 0, .35);
+        }
 
-<style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-body{
-font-family:Arial;
-background:#111;
-color:#eee;
-margin:0;
-}
+        body {
+            font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+            background: radial-gradient(circle at top left, #163222 0%, transparent 40%),
+                radial-gradient(circle at bottom right, #102a1c 0%, transparent 40%),
+                var(--bg);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+        }
 
-#top{ padding:10px; }
+        .app {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            height: 100vh;
+        }
 
-button{
-padding:10px 20px;
-font-size:16px;
-margin-bottom:10px;
-cursor:pointer;
-}
+        .sidebar {
+            padding: 24px;
+            border-right: 1px solid var(--stroke);
+            backdrop-filter: blur(var(--blur));
+            background: var(--surface);
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
 
-.success{ color:#5cff72; }
-.error{ color:#ff4d4d; }
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
 
-#container{
-display:flex;
-height:70vh;
-}
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--stroke);
+            backdrop-filter: blur(var(--blur));
+            border-radius: var(--radius);
+            padding: 16px;
+        }
 
-#map{ width:35%; }
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
 
-#table-container{
-overflow:auto;
-}
+        button {
+            padding: 12px;
+            border: none;
+            border-radius: 14px;
+            cursor: pointer;
+            background: linear-gradient(180deg, var(--surface2), var(--surface));
+            color: var(--text);
+            border: 1px solid var(--stroke);
+            font-weight: 600;
+            transition: .2s;
+            text-align: center;
+        }
 
-table{
-border-collapse:collapse;
-width:100%;
-}
+        button:hover {
+            background: var(--primary);
+            color: #000;
+            transform: translateY(-2px);
+        }
 
-td,th{
-border:1px solid #444;
-padding:6px;
-font-size:13px;
-}
+        button.main-btn {
+            background: linear-gradient(180deg, var(--primary), var(--primary2));
+            color: #08120b;
+        }
 
-tr:hover{
-background:#222;
-cursor:pointer;
-}
+        #modal-content button[onclick="closeModal()"] {
+            position: absolute;
+            right: 16px;
+            top: 16px;
+            background: var(--surface2);
+            border: 1px solid var(--stroke);
+            color: var(--text);
+            font-size: 18px;
+            cursor: pointer;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            transition: 0.2s;
+        }
 
-.my-user{
-background:#1f3d2b !important;
-border-left:4px solid #00ff88;
-}
+        #modal-content button[onclick="closeModal()"]:hover {
+            background: var(--danger);
+            color: white;
+        }
 
-img{ border-radius:6px; }
+        .control-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
 
-pre{
-max-height:150px;
-overflow:auto;
-background:#000;
-padding:5px;
-}
+        .switch {
+            width: 44px;
+            height: 24px;
+            background: #3a413d;
+            border-radius: 20px;
+            position: relative;
+            cursor: pointer;
+            transition: .25s;
+        }
 
-/* progress */
-#progress-container{
-width:300px;
-height:10px;
-background:#333;
-margin-top:5px;
-border-radius:5px;
-overflow:hidden;
-}
+        .switch::after {
+            content: "";
+            position: absolute;
+            top: 3px;
+            left: 4px;
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            transition: .25s;
+        }
 
-#progress-bar{
-height:100%;
-width:0%;
-background:#00ff88;
-transition:width 0.2s;
-}
+        .switch.active {
+            background: var(--primary);
+        }
 
-.moved{ color:#00ff88; }
-.same{ color:#aaa; }
-.new{ color:#4da6ff; }
+        .switch.active::after {
+            left: 22px;
+        }
 
-/* modal */
-#modal{
-position:fixed;
-top:0;left:0;
-width:100%;height:100%;
-background:rgba(0,0,0,0.8);
-display:none;
-overflow:auto;
-padding:20px;
-z-index:9999;
-}
+        select {
+            padding: 8px 12px;
+            border: 1px solid var(--stroke);
+            border-radius: 10px;
+            background: #121815;
+            color: var(--text);
+            outline: none;
+            width: 110px;
+            cursor: pointer;
+            font-family: inherit;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 14px;
+        }
 
-#modal-content{
-background:#111;
-padding:20px;
-border:1px solid #444;
-}
+        select:hover {
+            border-color: var(--primary);
+        }
 
-</style>
+        select option {
+            background: #121815;
+            color: var(--text);
+            padding: 10px;
+        }
 
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--surface2);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--muted);
+        }
+
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: var(--surface2) var(--bg);
+        }
+
+        .main {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding: 16px;
+            gap: 16px;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 40% 1fr;
+            gap: 16px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        #map {
+            border-radius: var(--radius);
+            border: 1px solid var(--stroke);
+        }
+
+        .table-wrap {
+            overflow: auto;
+            border-radius: var(--radius);
+            background: var(--surface);
+            border: 1px solid var(--stroke);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            min-width: 1000px;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px;
+            color: var(--muted);
+            font-size: 10px;
+            text-transform: uppercase;
+            position: sticky;
+            top: 0;
+            background: #0b0f0d;
+            z-index: 10;
+        }
+
+        td {
+            padding: 12px;
+            border-top: 1px solid var(--stroke);
+            vertical-align: middle;
+        }
+
+        tr:hover {
+            background: rgba(255, 255, 255, .04);
+            cursor: pointer;
+        }
+
+        .my-user td {
+            background: rgba(125, 220, 154, 0.08) !important;
+            border-top: 1px solid var(--primary);
+        }
+
+        .moved {
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .same {
+            color: var(--muted);
+        }
+
+        .new {
+            color: #6ea8ff;
+        }
+
+        /* UTILS */
+        .avatar-small {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            object-fit: cover;
+        }
+
+        .online-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+
+        #progress-container {
+            height: 6px;
+            background: var(--surface2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--primary), var(--primary2));
+            transition: 0.3s;
+        }
+
+        #modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            z-index: 9999;
+            backdrop-filter: blur(10px);
+            align-items: center;
+            justify-content: center;
+        }
+
+        #modal-content {
+            background: #121815;
+            padding: 30px;
+            border-radius: 24px;
+            border: 1px solid var(--stroke);
+            max-width: 600px;
+            width: 90%;
+            position: relative;
+            max-height: 80vh;
+            overflow: auto;
+        }
+
+        .avatar-marker {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 3px solid white;
+            box-shadow: var(--shadow);
+            background: #111;
+        }
+
+        .avatar-marker.online {
+            border-color: #00ff66;
+        }
+
+        .avatar-marker img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .avatar-placeholder {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            text-transform: uppercase;
+        }
+
+        .shimmer-active {
+            position: relative;
+            overflow: hidden !important;
+        }
+
+        .shimmer-active::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            background: linear-gradient(90deg,
+                    transparent 0%,
+                    rgba(255, 255, 255, 0.08) 50%,
+                    transparent 100%);
+            background-size: 200% 100%;
+            animation: shimmer 1.2s infinite linear;
+            z-index: 5;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: 200% 0;
+            }
+
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        .avatar-placeholder.round {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            font-size: 20px;
+        }
+
+        .clicked-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .clicked-shimmer::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            animation: shimmer-once 0.8s ease-out;
+            pointer-events: none;
+        }
+
+        @keyframes shimmer-once {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100%);
+            }
+        }
+    </style>
 </head>
 
 <body>
 
-<div id="top">
-
-<h2>Blink Friends Tracker</h2>
-
-<button onclick="loadData()">Refresh info</button>
-<button onclick="refreshSession()">Refresh session</button>
-
-<div id="status"></div>
-<div id="progress-text"></div>
-
-<div id="progress-container">
-  <div id="progress-bar"></div>
-</div>
-
-<div id="updated"></div>
-<div id="count"></div>
-
-</div>
-
-<div id="container">
-
-<div id="map"></div>
-
-<div id="table-container">
-
-<table>
-
-<thead>
-<tr>
-<th>Avatar</th>
-<th>User (ID)</th>
-<th>Lat</th>
-<th>Lon</th>
-<th>Change</th>
-<th>Idle</th>
-<th>Battery</th>
-<th>Accuracy</th>
-<th>Last update</th>
-<th>Last online</th>
-<th>Place Type</th>
-<th>Marker Tail</th>
-<th>Actions</th>
-<th>JSON</th>
-</tr>
-</thead>
-
-<tbody id="tbody"></tbody>
-
-</table>
-
-</div>
-
-</div>
-
-<!-- MODAL -->
-<div id="modal">
-<div id="modal-content"></div>
-<button onclick="closeModal()">Close</button>
-</div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<script>
-
-const map = L.map('map').setView([55.75141, 37.61895], 11)
-
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-maxZoom: 19
-}).addTo(map)
-
-let markersLayer = L.layerGroup().addTo(map)
-let prevCoords = {}
-
-let progressInterval = null
-
-function startProgress(){
-let progress = 0
-const bar = document.getElementById("progress-bar")
-const text = document.getElementById("progress-text")
-
-bar.style.width = "0%"
-
-progressInterval = setInterval(()=>{
-if(progress < 90){
-progress += Math.random() * 10
-bar.style.width = progress + "%"
-text.innerText = "Loading: " + Math.floor(progress) + "%"
-}
-}, 200)
-}
-
-function finishProgress(){
-clearInterval(progressInterval)
-document.getElementById("progress-bar").style.width = "100%"
-document.getElementById("progress-text").innerText = "Loading: 100%"
-}
-
-function formatBattery(val){
-if(val == null) return ""
-if(val < 0) return "⚡ Charging (" + Math.abs(val) + "%)"
-return "🔋 " + val + "%"
-}
-
-function formatDuration(seconds){
-seconds = Math.floor(seconds)
-const h = Math.floor(seconds / 3600)
-const m = Math.floor((seconds % 3600) / 60)
-const s = seconds % 60
-return `${h}h ${m}m ${s}s`
-}
-
-function formatPlaceType(type){
-switch(type){
-case 0: return "❌ Nothing"
-case 1: return "🏠 Home"
-case 2: return "💼 Work"
-case 3: return "🧑‍🏫 School"
-case 5: return "🚗 On the way"
-case 6: return "✈️ Airport"
-case 7: return "🌙 Home (sleepover)"
-default: return "❓ Unknown (" + type + ")"
-}
-}
-
-function showModal(html){
-document.getElementById("modal-content").innerHTML = html
-document.getElementById("modal").style.display = "block"
-}
-
-function closeModal(){
-document.getElementById("modal").style.display = "none"
-}
-
-function viewFriends(userId){
-
-fetch(`/friends/${userId}`)
-.then(r=>r.json())
-.then(data=>{
-
-let html = "<h3>Friends:</h3>"
-
-data.account_friends.forEach(f=>{
-html += `
-<div style="margin-bottom:10px">
-<img src="${f.avatar_thumbnail || ''}" width="40">
-<b>${f.username}</b> (${f.name || ""})<br>
-Friends: ${f.friends_count}
-</div>
-`
-})
-
-showModal(html)
-
-})
-
-}
-
-function sendSticker(userId){
-
-const stickerId = prompt("Type sticker ID:")
-if(!stickerId) return
-
-const count = prompt("Type count:")
-if(!count) return
-
-fetch(`/send_sticker/${userId}`, {
-method:"POST",
-headers:{
-"Content-Type":"application/json"
-},
-body: JSON.stringify({
-sticker_id: Number(stickerId),
-count: Number(count)
-})
-})
-.then(r=>r.json())
-.then(resp=>{
-if(resp.ok){
-alert("✅ Successfully sent")
-}else{
-alert("❌ Error, try again or sticker is not paid")
-}
-})
-
-}
-
-function getStatusAndIdle(id, lat, lon){
-
-const now = Date.now() / 1000
-
-if(!prevCoords[id]){
-prevCoords[id] = {lat, lon, lastMoveTs: now}
-return {change:"New", cls:"new", idle:"0s"}
-}
-
-const prev = prevCoords[id]
-
-if(prev.lat !== lat || prev.lon !== lon){
-prevCoords[id] = {lat, lon, lastMoveTs: now}
-return {change:"Moved", cls:"moved", idle:"0s"}
-}
-
-const idleSeconds = now - prev.lastMoveTs
-
-return {
-change:"Same",
-cls:"same",
-idle: formatDuration(idleSeconds)
-}
-
-}
-
-function addUserRow(user, isMy=false){
-
-const acc=user.account || {}
-const geo=user.geo || {}
-const customization = user.customization || {}
-
-const lat=geo.latitude
-const lon=geo.longitude
-
-const marker = L.marker([lat, lon]).addTo(markersLayer)
-
-marker.bindPopup(`
-<b>${acc.username} (${acc.id})</b><br>
-<img src="${acc.avatar_thumbnail || acc.avatar || ''}" width="80">
-`)
-
-if(isMy){
-marker.openPopup()
-map.setView([lat, lon], 14)
-}
-
-const st = getStatusAndIdle(acc.id, lat, lon)
-
-const row=document.createElement("tr")
-
-if(isMy){
-row.classList.add("my-user")
-}
-
-row.innerHTML=`
-
-<td><img src="${acc.avatar_thumbnail || acc.avatar || ''}" width="50"></td>
-
-<td>
-${acc.username}<br>
-<small style="color:#aaa">ID: ${acc.id}</small>
-</td>
-
-<td>${lat}</td>
-<td>${lon}</td>
-
-<td class="${st.cls}">${st.change}</td>
-<td>${st.idle}</td>
-
-<td>${formatBattery(geo.charge)}</td>
-<td>${geo.accuracy ?? ""}</td>
-<td>${geo.last_update || ""}</td>
-<td>${acc.last_online || ""}</td>
-
-<td>${formatPlaceType(geo.place_type)}</td>
-<td>${customization.marker_tail || ""}</td>
-
-<td>
-<button onclick="event.stopPropagation(); viewFriends(${acc.id})">Friends</button>
-<button onclick="event.stopPropagation(); sendSticker(${acc.id})">Send 🎧</button>
-</td>
-
-<td>
-<details>
-<summary>open</summary>
-<pre>${JSON.stringify(user,null,2)}</pre>
-</details>
-</td>
-
-`
-
-row.onclick = () => {
-map.setView([lat, lon], 16)
-marker.openPopup()
-}
-
-document.getElementById("tbody").appendChild(row)
-
-}
-
-function loadData(){
-
-startProgress()
-
-fetch("/markers")
-.then(r=>r.json())
-.then(resp=>{
-
-finishProgress()
-
-markersLayer.clearLayers()
-
-const statusDiv=document.getElementById("status")
-const updatedDiv=document.getElementById("updated")
-
-if(resp.status===200){
-statusDiv.innerHTML="API status: <span class='success'>200 (success)</span>"
-}else{
-statusDiv.innerHTML="API status: <span class='error'>"+resp.status+"</span>"
-}
-
-updatedDiv.innerText="Last update info: "+resp.updated_at
-
-const data=resp.data
-
-const tbody=document.getElementById("tbody")
-tbody.innerHTML=""
-
-document.getElementById("count").innerText="Users: "+data.markers.length
-
-if(data.my_marker){
-addUserRow(data.my_marker, true)
-}
-
-data.markers.forEach(user=>{
-addUserRow(user, false)
-})
-
-})
-
-.catch(err=>{
-finishProgress()
-document.getElementById("status").innerHTML="<span class='error'>Query Error</span>"
-document.getElementById("progress-text").innerText="Loading Error"
-})
-
-}
-
-function refreshSession(){
-fetch("/refresh_session", {method:"POST"})
-.then(r=>r.json())
-.then(resp=>{
-if(resp.success){
-alert("✅ Session updated")
-}else{
-alert("❌ Failed to refresh session")
-}
-})
-}
-
-loadData()
-
-</script>
+    <div class="app">
+        <div class="sidebar">
+            <div class="logo">Blink Friends Tracker</div>
+
+            <div class="card">
+                <div class="control-row">
+                    <span>Map Visible</span>
+                    <div id="mapSwitch" class="switch active"></div>
+                </div>
+                <div class="control-row">
+                    <span>Auto Refresh Markers</span>
+                    <div id="autoSwitch" class="switch"></div>
+                </div>
+                <div class="control-row" style="margin-bottom: 0;">
+                    <span>Interval</span>
+                    <select id="refresh-time">
+                        <option value="60000">1 min</option>
+                        <option value="300000">5 min</option>
+                        <option value="900000">15 min</option>
+                        <option value="3600000">1 hour</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="main-btn" onclick="loadData()">🔄 Refresh Markers</button>
+                <button onclick="refreshSession()">🔑 Refresh Session</button>
+            </div>
+
+            <div class="card" style="font-size: 13px;">
+                <div id="status">API status: Loading...</div>
+                <div id="count">Users: Loading...</div>
+                <div id="progress-text" style="font-size: 11px; margin-top: 10px; color: var(--muted);">Ready</div>
+                <div id="progress-container">
+                    <div id="progress-bar"></div>
+                </div>
+                <div id="updated" style="margin-top: 10px; font-size: 11px; color: var(--muted);"></div>
+            </div>
+
+            <div class="btn-group">
+                <button onclick="sendSteps()">👟 Send Steps</button>
+                <button onclick="viewStepsTop()">🏆 Top Steps (Today)</button>
+            </div>
+
+            <div class="btn-group">
+                <a href="https://github.com/elite-nick/blink_friends_tracker/blob/main/stuff/stickers_table.md"
+                    target="_blank" style="text-decoration: none;">
+                    <button style="width: 100%;">🔗 List All Audio-Stickers</button>
+                </a>
+                <a href="https://github.com/elite-nick/blink_friends_tracker" target="_blank"
+                    style="text-decoration: none;">
+                    <button style="width: 100%;">🔗 Github Page</button>
+                </a>
+            </div>
+        </div>
+
+
+
+        <div class="main">
+            <div class="content-grid">
+                <div id="map"></div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Avatar</th>
+                                <th>User (ID)</th>
+                                <th>Lat</th>
+                                <th>Lon</th>
+                                <th>Time on Place</th>
+                                <th>Idle</th>
+                                <th>Battery</th>
+                                <th>Acc.</th>
+                                <th>Last Update</th>
+                                <th>Last Online</th>
+                                <th>Place Type</th>
+                                <th>Marker Tail</th>
+                                <th>Actions</th>
+                                <th>JSON</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal" onclick="if(event.target==this) closeModal()">
+        <div id="modal-content">
+            <button
+                style="position:absolute; right:20px; top:20px; background:#222; border:none; color:white; font-size:16px; cursor:pointer; width:30px; height:30px; border-radius:50%;"
+                onclick="closeModal()">✕</button>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        let autoTimer = null;
+        let prevCoords = {};
+        let progressInterval = null;
+
+        const map = L.map('map').setView([55.75141, 37.61895], 11);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        let markersLayer = L.layerGroup().addTo(map);
+
+        const autoSwitch = document.getElementById("autoSwitch");
+        const mapSwitch = document.getElementById("mapSwitch");
+
+        autoSwitch.onclick = () => {
+            autoSwitch.classList.toggle("active");
+            scheduleNextRefresh();
+        };
+
+        mapSwitch.onclick = () => {
+            mapSwitch.classList.toggle("active");
+            const isVisible = mapSwitch.classList.contains("active");
+            const mapEl = document.getElementById("map");
+            const gridEl = document.querySelector(".content-grid");
+
+            mapEl.style.display = isVisible ? "block" : "none";
+            gridEl.style.gridTemplateColumns = isVisible ? "40% 1fr" : "1fr";
+
+            if (isVisible) setTimeout(() => map.invalidateSize(), 200);
+            map.closePopup();
+        };
+
+        function formatBattery(val) {
+            if (val == null) return "";
+            return (val < 0) ? `⚡ Charging ${Math.abs(val)}%` : `🔋 ${val}%`;
+        }
+
+        function formatDuration(seconds) {
+            seconds = Math.floor(seconds);
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            return `${h}h ${m}m ${s}s`;
+        }
+
+        function formatPlaceType(type) {
+            const types = { 0: "❌ Nothing", 1: "🏠 Home", 2: "💼 Work", 3: "🧑‍🏫 School", 5: "🚗 On the way", 6: "✈️ Airport", 7: "🌙 Sleepover" };
+            return types[type] || "❓ Unknown (" + type + ")";
+        }
+
+        function getStatusAndIdle(id, lat, lon) {
+            const now = Date.now() / 1000;
+            if (!prevCoords[id]) {
+                prevCoords[id] = { lat, lon, lastMoveTs: now };
+                return { change: "New", cls: "new", idle: "0s" };
+            }
+            const prev = prevCoords[id];
+            if (prev.lat !== lat || prev.lon !== lon) {
+                prevCoords[id] = { lat, lon, lastMoveTs: now };
+                return { change: "Moved", cls: "moved", idle: "0s" };
+            }
+            return { change: "Same", cls: "same", idle: formatDuration(now - prev.lastMoveTs) };
+        }
+
+        function startProgress() {
+            let p = 0;
+            const bar = document.getElementById("progress-bar");
+            const txt = document.getElementById("progress-text");
+            bar.style.width = "0%";
+            clearInterval(progressInterval);
+            progressInterval = setInterval(() => {
+                if (p < 90) { p += Math.random() * 15; bar.style.width = p + "%"; txt.innerText = "Loading: " + Math.floor(p) + "%"; }
+            }, 200);
+        }
+
+        function finishProgress() {
+            clearInterval(progressInterval);
+            document.getElementById("progress-bar").style.width = "100%";
+            document.getElementById("progress-text").innerText = "Update Complete";
+        }
+
+        async function loadData() {
+            const trigger = event && event.currentTarget ? event.currentTarget : null;
+            if (trigger) trigger.classList.add('shimmer-active');
+            startProgress();
+            try {
+                const r = await fetch("/markers");
+                const resp = await r.json();
+                if (trigger) trigger.classList.remove('shimmer-active');
+                finishProgress();
+
+                markersLayer.clearLayers();
+                const tbody = document.getElementById("tbody");
+                tbody.innerHTML = "";
+
+                const statusDiv = document.getElementById("status");
+                statusDiv.innerHTML = resp.status === 200 ? "API status: <span style='color:var(--primary)'>200 (OK)</span>" : "API status: <span style='color:var(--danger)'>" + resp.status + "</span>";
+                document.getElementById("updated").innerText = "Last info: " + resp.updated_at;
+
+                const data = resp.data;
+                document.getElementById("count").innerText = "Users: " + data.markers.length;
+
+                if (data.my_marker) addUserRow(data.my_marker, true);
+                data.markers.forEach(u => addUserRow(u, false));
+
+                scheduleNextRefresh();
+            } catch (e) {
+                if (trigger) trigger.classList.remove('shimmer-active');
+                finishProgress();
+                document.getElementById("status").innerHTML = "<span style='color:var(--danger)'>Query Error</span>";
+            }
+        }
+
+        function getAvatarHtml(acc, className = "avatar-small", isRound = false) {
+            const avatar = acc.avatar_thumbnail || acc.avatar;
+            if (avatar) {
+                return `<img src="${avatar}" class="${className}">`;
+            }
+            const colors = ['#f44336', '#9c27b0', '#3f51b5', '#00bcd4', '#4caf50', '#ff9800'];
+            const char = acc.username ? acc.username.charAt(0) : '?';
+            const bgColor = colors[acc.id % colors.length];
+            return `<div class="avatar-placeholder ${className} ${isRound ? 'round' : ''}" style="background:${bgColor}">${char}</div>`;
+        }
+
+        function addUserRow(user, isMy) {
+            const acc = user.account || {};
+            const geo = user.geo || {};
+            const cust = user.customization || {};
+            const lat = geo.latitude, lon = geo.longitude;
+            const entryTime = geo.first_entry || {};
+            const avatar = acc.avatar_thumbnail || acc.avatar || "";
+            const online = acc.online_now === true;
+
+            const icon = L.divIcon({
+                html: `<div class="avatar-marker ${online ? 'online' : ''}">${getAvatarHtml(acc, '', true)}</div>`,
+                className: "", iconSize: [52, 52], iconAnchor: [26, 26]
+            });
+            const marker = L.marker([lat, lon], { icon }).addTo(markersLayer);
+            const tr = document.createElement("tr");
+            tr.dataset.userId = acc.id;
+            tr.marker = marker;
+            const popupContent = `
+    <div style="text-align:center; min-width:100px;">
+        <b>${acc.username}</b><br>
+        <div style="margin-top:8px; display:inline-block; border-radius:12px; overflow:hidden;">
+            ${getAvatarHtml(acc, '', false)} 
+        </div>
+        <div style="font-size:10px; color:gray; margin-top:5px;">ID: ${acc.id}</div>
+    </div>
+`;
+            marker.bindPopup(popupContent);
+            if (isMy) {
+                map.setView([lat, lon], 14);
+                marker.openPopup();
+            }
+
+            const st = getStatusAndIdle(acc.id, lat, lon);
+            if (isMy) tr.className = "my-user";
+
+            tr.innerHTML = `
+        <td>${getAvatarHtml(acc)}</td>
+        <td>
+            <b>${acc.username}</b><br>
+            <small style="color:var(--muted)">ID: ${acc.id}</small>
+            ${online ? '<br><span style="color:var(--primary); font-size:10px">● ONLINE</span>' : ''}
+        </td>
+        <td><small>${lat}</small></td>
+        <td><small>${lon}</small></td>
+        <td style="color: var(--primary); font-weight: bold;">${entryTime}</td>
+        <td>${st.idle}</td>
+        <td>${formatBattery(geo.charge)}</td>
+        <td>${geo.accuracy ?? ""}</td>
+        <td><small>${geo.last_update || ""}</small></td>
+        <td><small>${acc.last_online || ""}</small></td>
+        <td>${formatPlaceType(geo.place_type)}</td>
+        <td>${cust.marker_tail || ""}</td>
+        <td>
+            <div style="display:flex; gap:5px">
+                <button style="padding:6px 10px; font-size:10px" onclick="event.stopPropagation(); viewFriends(${acc.id})">Friends</button>
+                ${!isMy ? `<button style="padding:6px 10px; font-size:10px" onclick="event.stopPropagation(); sendSticker(${acc.id})">Send 🎧</button>` : ''}
+            </div>
+        </td>
+        <td>
+            <details><summary>Open</summary><pre style="font-size:10px; background:#000; padding:10px; border-radius:10px; max-height:150px; overflow:auto;">${JSON.stringify(user, null, 2)}</pre></details>
+        </td>
+    `;
+            tr.onclick = () => {
+                markersLayer.eachLayer(layer => {
+                    if (layer instanceof L.Marker) layer.setZIndexOffset(0);
+                });
+
+                if (tr.marker) {
+                    tr.marker.setZIndexOffset(1000);
+
+                    map.setView([lat, lon], 16);
+                    tr.marker.openPopup();
+                }
+            };
+            document.getElementById("tbody").appendChild(tr);
+        }
+
+        function scheduleNextRefresh() {
+            clearTimeout(autoTimer);
+            if (!autoSwitch.classList.contains("active")) return;
+            autoTimer = setTimeout(loadData, Number(document.getElementById("refresh-time").value));
+        }
+
+        function viewFriends(id) {
+            fetch(`/friends/${id}`).then(r => r.json()).then(data => {
+                let html = "<h3>Friends List</h3><div style='margin-top:15px'>";
+                data.account_friends.forEach(f => {
+                    html += `<div style="display:flex; gap:12px; margin-bottom:12px; align-items:center; background:var(--surface2); padding:10px; border-radius:15px">
+                ${getAvatarHtml(f, 'avatar-small')}
+                <div><b>${f.username}</b><br><small style="color:var(--muted)">Friends: ${f.friends_count}</small></div>
+            </div>`;
+                });
+                html += "</div>";
+                showModal(html);
+            });
+        }
+
+        function sendSticker(userId) {
+            const sid = prompt("Enter sticker ID:");
+            if (!sid) return;
+            const count = prompt("Enter count:", "1");
+            if (!count) return;
+
+            fetch(`/send_sticker/${userId}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sticker_id: Number(sid), count: Number(count) })
+            }).then(r => r.json()).then(resp => {
+                alert(resp.ok ? "✅ Sent!" : "❌ Error! Try again or type exist sticker");
+            });
+        }
+
+        function sendSteps() {
+            const s = prompt("Enter steps to send?");
+            if (!s) return;
+            fetch("/send_steps", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ steps: Number(s) })
+            }).then(r => r.json()).then(resp => {
+                alert(resp.status === 200 ? "✅ Steps sent!" : "❌ Error!");
+            });
+        }
+
+        function viewStepsTop() {
+            fetch("/steps_top").then(r => r.json()).then(data => {
+                let html = "<h3>🏆 Today's Leaderboard</h3><br>";
+                if (data.my_stats) {
+                    html += `<div style="padding:15px; background:rgba(125,220,154,0.1); border:1px solid var(--primary); border-radius:15px; margin-bottom:20px">
+                    <b>YOU (#${data.my_stats.position})</b>: ${data.my_stats.steps} steps / ${data.my_stats.kilometers.toFixed(2)} km
+                </div>`;
+                }
+                if (data.friends_stats) {
+                    data.friends_stats.forEach(f => {
+                        html += `<div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid var(--stroke)">
+                        <span>${f.position}. ${f.account.username}</span>
+                        <b>${f.steps} steps</b>
+                    </div>`;
+                    });
+                }
+                showModal(html);
+            });
+        }
+
+        function refreshSession() {
+            fetch("/refresh_session", { method: "POST" }).then(r => r.json()).then(d => alert(d.success ? "✅ Session Refresh OK" : "❌ Failed"));
+        }
+
+        function showModal(html) {
+            document.getElementById("modal-body").innerHTML = html;
+            document.getElementById("modal").style.display = "flex";
+        }
+        function closeModal() { document.getElementById("modal").style.display = "none"; }
+
+        document.addEventListener('click', function (e) {
+            const target = e.target.closest('button, tr, .card, .switch');
+            if (target) {
+                target.classList.remove('clicked-shimmer');
+                void target.offsetWidth;
+                target.classList.add('clicked-shimmer');
+
+                setTimeout(() => target.classList.remove('clicked-shimmer'), 800);
+            }
+        }, true);
+        loadData();
+    </script>
 
 </body>
 
