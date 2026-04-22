@@ -419,7 +419,7 @@
 
         .clicked-shimmer {
             position: relative;
-            overflow: hidden;
+            overflow: hidden !important;
         }
 
         .clicked-shimmer::after {
@@ -694,9 +694,20 @@
             ${getAvatarHtml(acc, '', false)} 
         </div>
         <div style="font-size:10px; color:gray; margin-top:5px;">ID: ${acc.id}</div>
+        <div style="margin-top:5px;">${formatPlaceType(geo.place_type)}</div>
     </div>
 `;
             marker.bindPopup(popupContent);
+            marker.on('popupopen', function () {
+                const popup = marker.getPopup();
+                const img = popup.getElement().querySelector('img');
+
+                if (img && !img.complete) {
+                    img.onload = function () {
+                        popup.update();
+                    };
+                }
+            });
             if (isMy) {
                 map.setView([lat, lon], 14);
                 marker.openPopup();
@@ -725,7 +736,8 @@
         <td>
             <div style="display:flex; gap:5px">
                 <button style="padding:6px 10px; font-size:10px" onclick="event.stopPropagation(); viewFriends(${acc.id})">Friends</button>
-                ${!isMy ? `<button style="padding:6px 10px; font-size:10px" onclick="event.stopPropagation(); sendSticker(${acc.id})">Send 🎧</button>` : ''}
+                ${!isMy ? `<button style="padding:6px 10px; font-size:10px" onclick="event.stopPropagation(); sendSticker(${acc.id})">Send Sticker 🎧</button>` : ''}
+                ${!isMy ? `<button style="padding:6px 10px; font-size:10px; onclick="event.stopPropagation(); startBuzz(${acc.id})">Send Buzz ⚡</button>` : ''}
             </div>
         </td>
         <td>
@@ -826,7 +838,12 @@
 
         document.addEventListener('click', function (e) {
             const target = e.target.closest('button, tr, .card, .switch');
+
             if (target) {
+                if (target.classList.contains('switch') || e.target.closest('.switch')) {
+                    return;
+                }
+
                 target.classList.remove('clicked-shimmer');
                 void target.offsetWidth;
                 target.classList.add('clicked-shimmer');
@@ -834,6 +851,36 @@
                 setTimeout(() => target.classList.remove('clicked-shimmer'), 800);
             }
         }, true);
+
+        async function startBuzz(userId) {
+            let count = prompt("How many notifications send? (Limit 1-5)", "1");
+
+            if (count === null) return;
+
+            count = parseInt(count);
+            if (isNaN(count) || count < 1 || count > 5) {
+                alert("Please enter a number between 1 and 5");
+                return;
+            }
+
+            try {
+                const response = await fetch(`/buzz/${userId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ count: count })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert("✅ Sent!");
+                }
+            } catch (e) {
+                console.error("Buzz error:", e);
+                alert("❌ Error!");
+            }
+        }
+
         loadData();
     </script>
 

@@ -266,6 +266,35 @@ def steps_top():
             "raw": r.text
         })
 
+@app.route("/buzz/<int:user_id>", methods=["POST"])
+def send_buzz(user_id):
+    count = request.json.get("count", 1)
+    count = max(1, min(5, int(count)))
+    
+    results = []
+    for i in range(1, count + 1):
+        url = f"https://pin.apiblink.ru/api/buzz/{user_id}"
+        r = api_request("POST", url, 
+            headers={"Content-Type": "application/json; charset=utf-8"},
+            json={"step": i}
+        )
+        try:
+            res_data = r.json()
+        except:
+            res_data = r.text
+            
+        results.append({
+            "step": i,
+            "status": r.status_code,
+            "data": res_data
+        })
+
+    return jsonify({
+        "success": True, 
+        "user_id": user_id, 
+        "details": results
+    })
+
 if __name__ == "__main__":
     refresh_session()
     app.run(port=5000, debug=True)
