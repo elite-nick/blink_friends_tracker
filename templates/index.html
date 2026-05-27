@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blink Friends Tracker v0.4</title>
+    <title>Blink Friends Tracker v0.5</title>
     <link rel="icon" href="https://blinkmap.com/favicon-32x32.png">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
@@ -28,6 +28,8 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            scrollbar-width: thin;
+            scrollbar-color: var(--surface2) var(--bg);
         }
 
         body {
@@ -75,7 +77,7 @@
         .btn-group {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 8px; 
         }
 
         button {
@@ -89,6 +91,8 @@
             font-weight: 600;
             transition: .2s;
             text-align: center;
+            position: relative;
+            overflow: hidden !important;
         }
 
         button:hover {
@@ -208,11 +212,6 @@
             background: var(--muted);
         }
 
-        * {
-            scrollbar-width: thin;
-            scrollbar-color: var(--surface2) var(--bg);
-        }
-
         .main {
             display: flex;
             flex-direction: column;
@@ -245,7 +244,7 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 12px;
-            min-width: 1000px;
+            min-width: 1050px;
         }
 
         th {
@@ -378,11 +377,6 @@
             text-transform: uppercase;
         }
 
-        .shimmer-active {
-            position: relative;
-            overflow: hidden !important;
-        }
-
         .shimmer-active::after {
             content: "";
             position: absolute;
@@ -417,7 +411,6 @@
         }
 
         .clicked-shimmer {
-            position: relative;
             overflow: hidden !important;
         }
 
@@ -425,22 +418,93 @@
             content: "";
             position: absolute;
             top: 0;
-            left: 0;
-            width: 100%;
+            left: -75%;
+            width: 50%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-            animation: shimmer-once 0.8s ease-out;
+            z-index: 10;
+            background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.22) 50%, transparent 100%);
+            animation: shimmer-once 0.5s ease-out forwards;
             pointer-events: none;
         }
 
         @keyframes shimmer-once {
             0% {
-                transform: translateX(-100%);
+                left: -75%;
             }
 
             100% {
-                transform: translateX(100%);
+                left: 125%;
             }
+        }
+
+        .geo-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .geo-form label {
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .geo-form input {
+            width: 100%;
+            padding: 8px;
+            background: #000;
+            border: 1px solid var(--stroke);
+            border-radius: 8px;
+            color: white;
+        }
+
+        #mini-map {
+            height: 200px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            border: 1px solid var(--primary);
+        }
+
+        th:nth-child(1),
+        td:nth-child(1) {
+            position: sticky;
+            left: 0;
+            z-index: 20;
+            background: #0b0f0d;
+        }
+
+        th:nth-child(2),
+        td:nth-child(2) {
+            position: sticky;
+            left: 64px;
+            z-index: 20;
+            background: #0b0f0d;
+            border-right: 2px solid var(--stroke);
+        }
+
+        th:nth-child(1),
+        th:nth-child(2) {
+            z-index: 30;
+        }
+
+        .my-user td:nth-child(1),
+        .my-user td:nth-child(2) {
+            background: #122118 !important;
+        }
+
+        .actions-cell-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            width: 110px;
+        }
+
+        .actions-cell-wrapper button {
+            width: 100%;
+            padding: 6px 10px;
+            font-size: 10px;
+            border-radius: 8px;
+            text-align: center;
         }
     </style>
 </head>
@@ -449,8 +513,8 @@
 
     <div class="app">
         <div class="sidebar">
-            <div class="logo">Blink Friends Tracker</div>
-            <div style="font-size:10px; color:gray;">by elite-nick v0.4.2</div>
+            <div class="logo" id="logo-title" style="cursor:pointer;user-select:none;">Blink Friends Tracker</div>
+            <div style="font-size:10px; color:gray;">by elite-nick v0.5</div>
 
             <div class="card">
                 <div class="control-row">
@@ -458,23 +522,53 @@
                     <div id="mapSwitch" class="switch active"></div>
                 </div>
                 <div class="control-row">
-                    <span>Auto Refresh Markers</span>
+                    <span>Auto Refresh</span>
                     <div id="autoSwitch" class="switch"></div>
                 </div>
                 <div class="control-row" style="margin-bottom: 0;">
-                    <span>Interval</span>
+                    <span>Refresh Interval</span>
                     <select id="refresh-time">
+                        <option value="30000">30 sec</option>
                         <option value="60000">1 min</option>
                         <option value="300000">5 min</option>
                         <option value="900000">15 min</option>
                         <option value="3600000">1 hour</option>
                     </select>
                 </div>
+                <div class="card" style="margin-top: 16px;">
+                    <details>
+                        <summary style="cursor: pointer; font-weight: bold; color: var(--primary);">⚙️ Extra Settings
+                        </summary>
+                        <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 12px;">
+
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span style="font-size: 12px; color: var(--text);">Don't center on me after update</span>
+                                <label>
+                                    <input type="checkbox" id="skip-center-my" style="accent-color:var(--primary);">
+                                </label>
+                            </div>
+
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span style="font-size: 12px; color: var(--text);">Center on a user from the table</span>
+                                <label>
+                                    <input type="checkbox" id="center-on-click" style="accent-color:var(--primary);" checked>
+                                </label>
+                            </div>
+
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span style="font-size: 12px; color: var(--text);">Export to TXT when updating a map</span>
+                                <label>
+                                    <input type="checkbox" id="enable-export" style="accent-color:var(--primary);">
+                                </label>
+                            </div>
+
+                        </div>
+                    </details>
+                </div>
             </div>
 
             <div class="btn-group">
-                <button class="main-btn" onclick="loadData()">🔄 Refresh Markers</button>
-                <button onclick="refreshSession()">🔑 Refresh Session</button>
+                <button class="main-btn" onclick="loadData()">🔄 Refresh Map</button>
             </div>
 
             <div class="card" style="font-size: 13px;">
@@ -487,9 +581,27 @@
                 <div id="updated" style="margin-top: 10px; font-size: 11px; color: var(--muted);"></div>
             </div>
 
-            <div class="btn-group">
+            <div id="sim-progress-block" onclick="openSimStatusModal()"
+                style="display: none; background: var(--surface2); padding: 15px; border-radius: 12px; margin-top: 15px; cursor: pointer; border: 1px solid var(--primary); transition: transform 0.2s;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span style="font-size: 12px; font-weight: bold;">🚗 Simulation Active</span>
+                    <span id="sim-percent-text" style="font-size: 12px; color: var(--primary);">0%</span>
+                </div>
+                <div style="width: 100%; background: #eee; height: 8px; border-radius: 4px; overflow: hidden;">
+                    <div id="sim-progress-bar"
+                        style="width: 0%; height: 100%; background: var(--primary); transition: width 0.3s;"></div>
+                </div>
+                <p style="font-size: 10px; color: var(--muted); margin-top: 5px; text-align: center;">Click on this block to manage route</p>
+            </div>
+            <div id="secret-btn-group"
+                style="display:none; flex-direction:column; gap:8px; opacity:0; transform:translateY(-8px); transition:opacity 0.35s ease, transform 0.35s ease;">
+                <button onclick="openGeoModal()">📍 Set My Location</button>
+                <button onclick="openRouteModal()">🚗 Create Route Simulation (BETA)</button>
                 <button onclick="sendSteps()">👟 Send Steps</button>
-                <button onclick="viewStepsTop()">🏆 Top Steps (Today)</button>
+            </div>
+
+            <div class="btn-group">
+                <button onclick="viewStepsTop()">Top Steps (Today)</button>
             </div>
 
             <div class="btn-group">
@@ -503,8 +615,6 @@
                 </a>
             </div>
         </div>
-
-
 
         <div class="main">
             <div class="content-grid">
@@ -548,7 +658,15 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+    <script type="module">
+        import Geohash from 'https://cdn.jsdelivr.net/npm/latlon-geohash@2.0.0';
+        window.Geohash = Geohash;
+        console.log('Geohash module loaded');
+    </script>
+
     <script>
+        let simulationActive = false;
+        let currentRoutePoints = [];
         let autoTimer = null;
         let prevCoords = {};
         let progressInterval = null;
@@ -617,7 +735,7 @@
             bar.style.width = "0%";
             clearInterval(progressInterval);
             progressInterval = setInterval(() => {
-                if (p < 90) { p += Math.random() * 15; bar.style.width = p + "%"; txt.innerText = "Loading: " + Math.floor(p) + "%"; }
+                if (p < 90) { p += Math.random() * 7; bar.style.width = p + "%"; txt.innerText = "Loading: " + Math.floor(p) + "%"; }
             }, 200);
         }
 
@@ -630,9 +748,12 @@
         async function loadData() {
             const trigger = event && event.currentTarget ? event.currentTarget : null;
             if (trigger) trigger.classList.add('shimmer-active');
+
+            const exportEnabled = document.getElementById('enable-export').checked;
+
             startProgress();
             try {
-                const r = await fetch("/markers");
+                const r = await fetch(`/markers?export=${exportEnabled}`);
                 const resp = await r.json();
                 if (trigger) trigger.classList.remove('shimmer-active');
                 finishProgress();
@@ -676,7 +797,6 @@
             const cust = user.customization || {};
             const lat = geo.latitude, lon = geo.longitude;
             const entryTime = geo.first_entry || {};
-            const avatar = acc.avatar_thumbnail || acc.avatar || "";
             const online = acc.online_now === true;
 
             const icon = L.divIcon({
@@ -688,15 +808,15 @@
             tr.dataset.userId = acc.id;
             tr.marker = marker;
             const popupContent = `
-    <div style="text-align:center; min-width:100px;">
-        <b>${acc.username}</b><br>
-        <div style="margin-top:8px; display:inline-block; border-radius:12px; overflow:hidden;">
-            ${getAvatarHtml(acc, '', false)} 
-        </div>
-        <div style="font-size:10px; color:gray; margin-top:5px;">ID: ${acc.id}</div>
-        <div style="margin-top:5px;">${formatPlaceType(geo.place_type)}</div>
-    </div>
-`;
+                <div style="text-align:center; min-width:100px;">
+                    <b>${acc.username}</b><br>
+                    <div style="margin-top:8px; display:inline-block; border-radius:12px; overflow:hidden;">
+                        ${getAvatarHtml(acc, '', false)} 
+                    </div>
+                    <div style="font-size:10px; color:gray; margin-top:5px;">ID: ${acc.id}</div>
+                    <div style="margin-top:5px;">${formatPlaceType(geo.place_type)}</div>
+                </div>
+            `;
             marker.bindPopup(popupContent);
             marker.on('popupopen', function () {
                 const popup = marker.getPopup();
@@ -709,50 +829,56 @@
                 }
             });
             if (isMy) {
-                map.setView([lat, lon], 14);
-                marker.openPopup();
+                const skipCenter = document.getElementById('skip-center-my').checked;
+                if (!skipCenter) {
+                    map.setView([lat, lon], 14);
+                    marker.openPopup();
+                }
             }
 
             const st = getStatusAndIdle(acc.id, lat, lon);
             if (isMy) tr.className = "my-user";
 
             tr.innerHTML = `
-        <td>${getAvatarHtml(acc)}</td>
-        <td>
-            <b>${acc.username}</b><br>
-            <small style="color:var(--muted)">ID: ${acc.id}</small>
-            ${online ? '<br><span style="color:var(--primary); font-size:10px">● ONLINE</span>' : ''}
-        </td>
-        <td><small>${lat}</small></td>
-        <td><small>${lon}</small></td>
-        <td style="color: var(--primary); font-weight: bold;">${entryTime}</td>
-        <td>${st.idle}</td>
-        <td>${formatBattery(geo.charge)}</td>
-        <td>${geo.accuracy ?? ""}</td>
-        <td><small>${geo.last_update || ""}</small></td>
-        <td><small>${acc.last_online || ""}</small></td>
-        <td>${formatPlaceType(geo.place_type)}</td>
-        <td>${cust.marker_tail || ""}</td>
-        <td>
-            <div style="display:flex; gap:5px">
-                <button style="padding:6px 10px; font-size:10px" onclick="event.stopPropagation(); viewFriends(${acc.id})">Friends</button>
-                ${!isMy ? `<button style="padding:6px 10px; font-size:10px" onclick="event.stopPropagation(); sendSticker(${acc.id})">Send Sticker 🎧</button>` : ''}
-                ${!isMy ? `<button style="padding:6px 10px; font-size:10px" onclick="event.stopPropagation(); startBuzz(${acc.id})">Send Buzz ⚡</button>` : ''}
-            </div>
-        </td>
-        <td>
-            <details><summary>Open</summary><pre style="font-size:10px; background:#000; padding:10px; border-radius:10px; max-height:150px; overflow:auto;">${JSON.stringify(user, null, 2)}</pre></details>
-        </td>
-    `;
+                <td>${getAvatarHtml(acc)}</td>
+                <td>
+                    <b>${acc.username}</b><br>
+                    <small style="color:var(--muted)">ID: ${acc.id}</small>
+                    ${online ? '<br><span style="color:var(--primary); font-size:10px">● ONLINE</span>' : ''}
+                </td>
+                <td><small>${lat}</small></td>
+                <td><small>${lon}</small></td>
+                <td style="color: var(--primary); font-weight: bold;">${entryTime}</td>
+                <td>${st.idle}</td>
+                <td>${formatBattery(geo.charge)}</td>
+                <td>${geo.accuracy ?? ""}</td>
+                <td><small>${geo.last_update || ""}</small></td>
+                <td><small>${acc.last_online || ""}</small></td>
+                <td>${formatPlaceType(geo.place_type)}</td>
+                <td>${cust.marker_tail || ""}</td>
+                <td>
+                    <div class="actions-cell-wrapper">
+                        <button onclick="event.stopPropagation(); viewFriends(${acc.id})">Friends</button>
+                        ${!isMy ? `<button onclick="event.stopPropagation(); sendSticker(${acc.id})">Send Sticker 🎧</button>` : ''}
+                        ${!isMy ? `<button onclick="event.stopPropagation(); startBuzz(${acc.id})">Send Buzz ⚡</button>` : ''}
+                    </div>
+                </td>
+                <td>
+                    <details><summary>Open</summary><pre style="font-size:10px; background:#000; padding:10px; border-radius:10px; max-height:150px; overflow:auto;">${JSON.stringify(user, null, 2)}</pre></details>
+                </td>
+            `;
             tr.onclick = () => {
+                const shouldCenter = document.getElementById('center-on-click').checked;
+
                 markersLayer.eachLayer(layer => {
                     if (layer instanceof L.Marker) layer.setZIndexOffset(0);
                 });
 
                 if (tr.marker) {
                     tr.marker.setZIndexOffset(1000);
-
-                    map.setView([lat, lon], 16);
+                    if (shouldCenter) {
+                        map.setView([lat, lon], 16);
+                    }
                     tr.marker.openPopup();
                 }
             };
@@ -837,18 +963,20 @@
         function closeModal() { document.getElementById("modal").style.display = "none"; }
 
         document.addEventListener('click', function (e) {
-            const target = e.target.closest('button, tr, .card, .switch');
+            const target = e.target.closest('button, .card, .switch');
 
             if (target) {
                 if (target.classList.contains('switch') || e.target.closest('.switch')) {
-                    return;
+                    if (!target.classList.contains('switch')) return;
                 }
 
                 target.classList.remove('clicked-shimmer');
                 void target.offsetWidth;
                 target.classList.add('clicked-shimmer');
 
-                setTimeout(() => target.classList.remove('clicked-shimmer'), 800);
+                target.addEventListener('animationend', () => {
+                    target.classList.remove('clicked-shimmer');
+                }, { once: true });
             }
         }, true);
 
@@ -876,14 +1004,373 @@
                     alert("✅ Sent!");
                 }
             } catch (e) {
-                console.error("Buzz error:", e);
+                console.error("Buzz error: ", e);
                 alert("❌ Error!");
             }
         }
 
+        let miniMap = null;
+        let selectedMarker = null;
+
+        function openGeoModal() {
+            document.getElementById('modal-content').style.maxWidth = '800px';
+            const html = `
+                <h3>Set Custom Location</h3>
+                <p style="font-size: 12px; color: var(--muted); margin-bottom: 10px;">Click on map!</p>
+                <div id="mini-map"></div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px;">
+                    <div style="display:flex; flex-direction:column; gap:5px;">
+                        <label style="font-size:11px; color:var(--muted);">Accuracy (m)</label>
+                        <input type="number" id="geo-acc" value="1" style="padding:9px 11px; background:#0b0f0d; border:1px solid var(--stroke); border-radius:10px; color:white; font-size:13px; outline:none; width:100%;">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:5px;">
+                        <label style="font-size:11px; color:var(--muted);">Battery Charge (%)</label>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <input type="number" id="geo-charge" value="85" style="flex:1; min-width:0; padding:9px 11px; background:#0b0f0d; border:1px solid var(--stroke); border-radius:10px; color:white; font-size:13px; outline:none;">
+                            <label style="display:flex; align-items:center; gap:5px; padding:0 12px; background:#0b0f0d; border:1px solid var(--stroke); border-radius:10px; cursor:pointer; font-size:14px; white-space:nowrap; height:39px;">
+                                <input type="checkbox" id="geo-charging" style="accent-color:var(--primary);"> &#9889;
+                            </label>
+                        </div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:5px;">
+                        <label style="font-size:11px; color:var(--muted);">Altitude</label>
+                        <input type="number" id="geo-alt" value="0" style="padding:9px 11px; background:#0b0f0d; border:1px solid var(--stroke); border-radius:10px; color:white; font-size:13px; outline:none; width:100%;">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:5px;">
+                        <label style="font-size:11px; color:var(--muted);">Speed</label>
+                        <input type="number" id="geo-speed" value="0" style="padding:9px 11px; background:#0b0f0d; border:1px solid var(--stroke); border-radius:10px; color:white; font-size:13px; outline:none; width:100%;">
+                    </div>
+                </div>
+                <button class="main-btn" onclick="submitGeo()" style="width: 100%; margin-top: 20px;">🚀 Send Location Data</button>
+            `;
+            showModal(html);
+
+            setTimeout(() => {
+                miniMap = L.map('mini-map').setView(map.getCenter(), 13);
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(miniMap);
+
+                miniMap.on('click', (e) => {
+                    if (selectedMarker) miniMap.removeLayer(selectedMarker);
+                    selectedMarker = L.marker(e.latlng).addTo(miniMap);
+                    miniMap.selectedLat = e.latlng.lat;
+                    miniMap.selectedLon = e.latlng.lng;
+                });
+            }, 200);
+        }
+
+        async function submitGeo() {
+            if (!miniMap || !miniMap.selectedLat) {
+                alert("Please click on the map first!");
+                return;
+            }
+
+            let chargeVal = parseInt(document.getElementById('geo-charge').value);
+            const isCharging = document.getElementById('geo-charging').checked;
+
+            if (isCharging && chargeVal > 0) {
+                chargeVal = -chargeVal;
+            }
+
+            const payload = {
+                lat: miniMap.selectedLat,
+                lon: miniMap.selectedLon,
+                geohash: Geohash.encode(miniMap.selectedLat, miniMap.selectedLon, 8),
+                accuracy: document.getElementById('geo-acc').value,
+                charge: chargeVal
+            };
+
+            try {
+                const r = await fetch("/update_geo", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
+
+                const res = await r.json();
+
+                if (res.result === 1) {
+                    alert("✅ Success!");
+                    closeModal();
+                    loadData();
+                } else {
+                    alert("❌ Error: " + (res.error || "Unknown"));
+                }
+            } catch (e) {
+                console.error("Fetch error:", e);
+                alert("❌ Error: " + e.message);
+            }
+        }
+
+        async function openRouteModal() {
+            const html = `
+                <h3>Route Simulator</h3>
+                <p style="font-size: 11px; color: var(--muted);">1. Click the starting point on the map. 2. Click the ending point on the map. 3. The route will be created automatically, and the route emulation button will appear!</p>
+                <div id="sim-map" style="height: 250px; border-radius: 15px; border: 1px solid var(--primary); margin-bottom: 10px;"></div>
+                
+                <div class="geo-form" style="grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                    <div>
+                        <label>Initial Speed (km/h)</label>
+                        <input type="number" id="sim-start-speed" value="60">
+                    </div>
+                    <div>
+                        <label>Battery Charge (%)</label>
+                        <input type="number" id="sim-start-charge" value="90">
+                    </div>
+                    <div style="grid-column: span 2;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="sim-dynamic-speed" checked> 
+                            <span>Dynamic Speed (±5 km/h fluctuation)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <button id="start-sim-btn" class="main-btn" onclick="startRouteSimFromModal()" style="width: 100%; display:none;">🏁 Start Journey</button>
+            `;
+            showModal(html);
+
+            let waypoints = [];
+            setTimeout(() => {
+                const simMap = L.map('sim-map').setView(map.getCenter(), 13);
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(simMap);
+
+                simMap.on('click', async (e) => {
+                    if (waypoints.length >= 2) waypoints = [];
+
+                    waypoints.push(e.latlng);
+                    L.marker(e.latlng).addTo(simMap);
+
+                    if (waypoints.length === 2) {
+                        const url = `https://router.project-osrm.org/route/v1/driving/${waypoints[0].lng},${waypoints[0].lat};${waypoints[1].lng},${waypoints[1].lat}?overview=full&geometries=geojson`;
+                        const r = await fetch(url);
+                        const data = await r.json();
+
+                        if (data.routes && data.routes.length > 0) {
+                            const route = data.routes[0];
+                            currentRoutePoints = route.geometry.coordinates.map(c => [c[1], c[0]]);
+                            simState.totalDistance = route.distance;
+
+                            L.geoJSON(route.geometry).addTo(simMap);
+                            document.getElementById('start-sim-btn').style.display = 'block';
+                        }
+                    }
+                });
+            }, 300);
+        }
+
+        let simState = {
+            activeIndex: 0,
+            totalPoints: 0,
+            isPaused: false,
+            speed: 60,
+            charge: 90,
+            isDynamic: true,
+            totalDistance: 0,
+            lastUpdateTime: null
+        };
+
+        function updateSimulationSpeed(val) {
+            simState.speed = parseInt(val);
+        }
+
+        function toggleSimulationPause() {
+            simState.isPaused = !simState.isPaused;
+        }
+
+        function openSimStatusModal() {
+            if (!simulationActive) return;
+
+            const remainingPoints = simState.totalPoints - simState.activeIndex;
+            const ratio = remainingPoints / simState.totalPoints;
+            const remainingDistKm = (simState.totalDistance / 1000) * ratio;
+
+            const getEta = (speed) => {
+                const hours = remainingDistKm / speed;
+                const mins = Math.round(hours * 60);
+                return mins > 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins} min`;
+            };
+
+            const html = `
+                <h3>Route Management</h3>
+                
+                <div style="background: var(--surface); padding: 15px; border-radius: 10px; margin-bottom: 15px; text-align: center;">
+                    <div style="font-size: 12px; color: var(--muted);">Estimated Time Remaining</div>
+                    <div id="modal-eta" style="font-size: 20px; font-weight: bold; color: var(--primary);">${getEta(simState.speed)}</div>
+                    <div style="font-size: 11px; margin-top: 5px;">Dist: ${remainingDistKm.toFixed(1)} km</div>
+                </div>
+                
+                <div class="control-row" style="margin-bottom: 20px;">
+                    <label style="display: flex; justify-content: space-between;">
+                        <span>Speed</span>
+                        <b><span id="modal-speed-val">${simState.speed}</span> km/h</b>
+                    </label>
+                    <input type="range" min="10" max="250" value="${simState.speed}" 
+                           oninput="updateSimulationSpeed(this.value); 
+                                    document.getElementById('modal-speed-val').innerText=this.value;
+                                    updateModalEta(${remainingDistKm}, this.value)" 
+                           style="width: 100%;">
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <button class="main-btn" onclick="toggleSimulationPause(); closeModal();" style="flex: 1; background: #607d8b;">
+                        ${simState.isPaused ? '▶️ Resume' : '⏸ Pause'}
+                    </button>
+                    <button class="main-btn" onclick="stopSimulation(); closeModal();" style="flex: 1; background: #f44336;">
+                        🛑 Stop
+                    </button>
+                </div>
+            `;
+            showModal(html);
+        }
+
+        function updateModalEta(dist, speed) {
+            const mins = Math.round((dist / speed) * 60);
+            const text = mins > 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins} min`;
+            document.getElementById('modal-eta').innerText = text;
+        }
+
+        async function startRouteSim() {
+            if (currentRoutePoints.length === 0) return;
+
+            closeModal();
+            simulationActive = true;
+            simState.isPaused = false;
+            simState.totalPoints = currentRoutePoints.length;
+            simState.activeIndex = 0;
+
+            document.getElementById('sim-progress-block').style.display = 'block';
+
+            const moveNext = async () => {
+                if (!simulationActive) return;
+                if (simState.isPaused) {
+                    setTimeout(moveNext, 1000);
+                    return;
+                }
+
+                if (simState.activeIndex >= simState.totalPoints) {
+                    stopSimulation();
+                    alert("🏁 Journey completed!");
+                    return;
+                }
+
+                const [lat, lon] = currentRoutePoints[simState.activeIndex];
+                const now = Date.now();
+                const shouldUpdate = !simState.lastUpdateTime || (now - simState.lastUpdateTime >= 5000);
+
+                let displaySpeed = simState.speed;
+                if (simState.isDynamic) {
+                    displaySpeed = simState.speed + (Math.random() * 10 - 5);
+                }
+                displaySpeed = Math.max(5, displaySpeed);
+
+                let distanceToNext = 0;
+                let currentHeading = -1.0;
+
+                if (simState.activeIndex < currentRoutePoints.length - 1) {
+                    const [nLat, nLon] = currentRoutePoints[simState.activeIndex + 1];
+                    currentHeading = calculateHeading(lat, lon, nLat, nLon);
+
+                    const R = 6371e3;
+                    const φ1 = lat * Math.PI / 180;
+                    const φ2 = nLat * Math.PI / 180;
+                    const Δφ = (nLat - lat) * Math.PI / 180;
+                    const Δλ = (nLon - lon) * Math.PI / 180;
+                    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                        Math.cos(φ1) * Math.cos(φ2) *
+                        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                    distanceToNext = R * c;
+                }
+
+                if (shouldUpdate) {
+                    try {
+                        const payload = {
+                            lat: lat,
+                            lon: lon,
+                            geohash: window.Geohash.encode(lat, lon, 8),
+                            accuracy: 5,
+                            charge: simState.charge,
+                            heading: currentHeading,
+                            speed: displaySpeed
+                        };
+
+                        await fetch("/update_geo", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(payload)
+                        });
+
+                        loadData();
+                        simState.lastUpdateTime = now;
+                    } catch (e) { console.error("Sim error:", e); }
+                }
+
+                simState.activeIndex++;
+                updateProgressUI();
+
+                let delay = (distanceToNext * 3600) / displaySpeed;
+                setTimeout(moveNext, Math.max(50, delay));
+            };
+
+            moveNext();
+        }
+
+        function updateProgressUI() {
+            const percent = Math.round((simState.activeIndex / simState.totalPoints) * 100);
+            document.getElementById('sim-progress-bar').style.width = percent + '%';
+            document.getElementById('sim-percent-text').innerText = percent + '%';
+        }
+
+        function stopSimulation() {
+            simulationActive = false;
+            document.getElementById('sim-progress-block').style.display = 'none';
+        }
+
+        function calculateHeading(lat1, lon1, lat2, lon2) {
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const y = Math.sin(dLon) * Math.cos(lat2 * Math.PI / 180);
+            const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+                Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLon);
+            const brng = Math.atan2(y, x) * 180 / Math.PI;
+            return (brng + 360) % 360;
+        }
+
+        function startRouteSimFromModal() {
+            simState.speed = parseInt(document.getElementById('sim-start-speed').value) || 60;
+            simState.charge = parseInt(document.getElementById('sim-start-charge').value) || 90;
+            simState.isDynamic = document.getElementById('sim-dynamic-speed').checked;
+
+            startRouteSim();
+        }
+
+        let _logoClicks = 0;
+        let _logoTimer = null;
+        document.getElementById("logo-title").addEventListener("click", function () {
+            _logoClicks++;
+            clearTimeout(_logoTimer);
+            _logoTimer = setTimeout(() => { _logoClicks = 0; }, 3000);
+            if (_logoClicks >= 10) {
+                _logoClicks = 0;
+                const grp = document.getElementById("secret-btn-group");
+                const isVisible = grp.style.display === "flex";
+                if (!isVisible) {
+                    grp.style.display = "flex";
+                    grp.style.flexDirection = "column";
+                    requestAnimationFrame(() => {
+                        grp.style.opacity = "1";
+                        grp.style.transform = "translateY(0)";
+                    });
+                } else {
+                    grp.style.opacity = "0";
+                    grp.style.transform = "translateY(-8px)";
+                    setTimeout(() => { grp.style.display = "none"; }, 360);
+                }
+            }
+        });
+
         loadData();
     </script>
-
 </body>
 
 </html>

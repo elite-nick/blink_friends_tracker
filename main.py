@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, render_template, request
 import requests
 from datetime import datetime
+import os
 
 app = Flask(__name__)
 
@@ -19,6 +20,45 @@ BASE_HEADERS = {
 
 SESSION_TOKEN = None
 
+LOGS_DIR = "logs"
+if not os.path.exists(LOGS_DIR):
+    os.makedirs(LOGS_DIR)
+
+def export_to_txt(data):
+    now = datetime.now()
+    filename = os.path.join(LOGS_DIR, f"{now.strftime('%Y-%m-%d')}.txt")
+    
+    entry = [f"--- Update: {now.strftime('%Y-%m-%d %H:%M:%S')} ---"]
+    
+    markers = data.get("markers", [])
+    if data.get("my_marker"):
+        markers = [data["my_marker"]] + markers
+
+    for m in markers:
+        acc = m.get("account", {})
+        geo = m.get("geo", {})
+        
+        username = acc.get("username", "Unknown")
+        user_id = acc.get("id", "N/A")
+        lat = geo.get("latitude", 0)
+        lon = geo.get("longitude", 0)
+        
+        google_maps_link = f"https://www.google.com/maps?q={lat},{lon}"
+        
+        line = (f"ID: {user_id} | User: {username} | Coord: {lat}, {lon} | "
+                f"Change: {geo.get('charge', '?')}% | Map Link: {google_maps_link}")
+        entry.append(line)
+    
+    entry.append("\n")
+    new_content = "\n".join(entry)
+
+    existing_content = ""
+    if os.path.exists(filename):
+        with open(filename, "r", encoding="utf-8") as f:
+            existing_content = f.read()
+
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write(new_content + existing_content)
 
 def refresh_session():
     global SESSION_TOKEN
@@ -171,6 +211,10 @@ def markers():
         acc["last_online"] = ts_to_date(
             acc.get("last_online_ts")
         )
+        
+        should_export = request.args.get("export") == "true"
+        if should_export and status_code == 200:
+            export_to_txt(data)
 
     return jsonify({
         "status": status_code,
@@ -294,6 +338,45 @@ def send_buzz(user_id):
         "user_id": user_id, 
         "details": results
     })
+
+@app.route("/update_geo", methods=["POST"])
+def update_geo():
+    data = request.json
+    url = "https://pin.apiblink.ru/api/geo/android"
+    
+    payload = {
+        "background": False,
+        "geo": [{
+            "service": 0,
+            "provider": 0,
+            "priority": 0,
+            "latitude": float(data['lat']),
+            "longitude": float(data['lon']),
+            "altitude": float(data.get('altitude', 0.0)),
+            "speed": float(data.get('speed', 0.0)),
+            "timestamp": int(datetime.now().timestamp()),
+            "accuracy": int(data.get('accuracy', 1)),
+            "charge": int(data.get('charge', 80)),
+            "heading": float(data.get('heading', -1.0)),
+            "geohash": data['geohash'],
+            "mock": False,
+            "ignore_rules": False,
+            "speed_accuracy_mps": -1.0,
+            "vertical_accuracy_m": 2.0,
+            "bearing_accuracy_deg": -1.0,
+            "msl_altitude_m": -1.0,
+            "msl_altitude_accuracy_m": -1.0
+        }],
+        "device": {
+            "brand": "samsung",
+            "model": "SM-G9810",
+            "manufacture": "samsung",
+            "sdk": 35
+        }
+    }
+
+    r = api_request("POST", url, json=payload, headers={"Content-Type": "application/json"})
+    return jsonify(r.json() if r.status_code == 200 else {"error": r.text})
 
 if __name__ == "__main__":
     refresh_session()
