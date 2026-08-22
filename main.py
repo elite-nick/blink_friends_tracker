@@ -45,8 +45,8 @@ def export_to_txt(data):
         
         google_maps_link = f"https://www.google.com/maps?q={lat},{lon}"
         
-        line = (f"ID: {user_id} | User: {username} | Coord: {lat}, {lon} | "
-                f"Change: {geo.get('charge', '?')}% | Map Link: {google_maps_link}")
+        line = (f"ID: {user_id} | User: {username} | Coords: {lat}, {lon} | "
+                f"Battery: {geo.get('charge', '?')}% | Map Link: {google_maps_link}")
         entry.append(line)
     
     entry.append("\n")
