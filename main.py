@@ -297,8 +297,8 @@ def send_steps():
 
 @app.route("/steps_top")
 def steps_top():
-
-    url = "https://pin.apiblink.ru/api/step/stats?period=day"
+    period = request.args.get("period", "day")
+    url = f"https://pin.apiblink.ru/api/step/stats?period={period}"
 
     r = api_request("GET", url)
 
